@@ -15,9 +15,9 @@ id_file: ${dataset.id_file}
 
 hydra:
   job:
-    chdir: false   # IMPORTANT: do NOT change cwd (avoids relative-path issues)
+    chdir: false # IMPORTANT: do NOT change cwd (avoids relative-path issues)
   run:
-    dir: ./outputs_hydra/${now:%Y.%m.%d_%H:%M}  # where Hydra stores logs/config
+    dir: ./outputs_hydra/${now:%Y.%m.%d_%H:%M} # where Hydra stores logs/config
   job_logging:
     formatters:
       simple:

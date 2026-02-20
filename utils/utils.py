@@ -1,38 +1,41 @@
-import numpy as np
+import logging
 import os
 import subprocess
-
+import time
+from functools import (  # module for higher-order functions (functions that act on or return other functions)
+    wraps,
+)
 from pathlib import Path
 from typing import Optional, Sequence
 
-import time
-from functools import wraps #module for higher-order functions (functions that act on or return other functions)
-
 import nibabel as nib
-import pandas as pd
-from scipy import ndimage
-from nibabel.processing import resample_from_to
 import nibabel.freesurfer.io as fsio
-
+import numpy as np
+import pandas as pd
 import torch
 import trimesh
-import os
-import logging
-
-from sphericalunet.utils.utils import Get_neighs_order
+from nibabel.processing import resample_from_to
+from scipy import ndimage
 from sphericalunet.models.layers import pool_layer
+from sphericalunet.utils.utils import Get_neighs_order
 
-log = logging.getLogger(__name__) 
+log = logging.getLogger(__name__)
+
 
 def ico_level_to_n_vertices(ico_level: int):
-    """ Get the number of vertices for a given ico level. """
-    return 10 * 4 ** ico_level + 2
+    """Get the number of vertices for a given ico level."""
+    return 10 * 4**ico_level + 2
 
 
 def report_duration(func):
     """Decorator that measures and prints the execution time of a function."""
-    @wraps(func) #decorator of wrapper function , which prevents __name__, __dicstring__ and help() applied to input function be displayed as wrapper's info.
-    def wrapper(*args, **kwargs): #allow functions to accept a unknown number of arguments. args is a tuple; kwargs is a dict within the function
+
+    @wraps(
+        func
+    )  # decorator of wrapper function , which prevents __name__, __dicstring__ and help() applied to input function be displayed as wrapper's info.
+    def wrapper(
+        *args, **kwargs
+    ):  # allow functions to accept a unknown number of arguments. args is a tuple; kwargs is a dict within the function
         start = time.perf_counter()
         try:
             return func(*args, **kwargs)
@@ -40,40 +43,45 @@ def report_duration(func):
             end = time.perf_counter()
             elapsed = end - start
             print(f"{func.__name__} took {elapsed:.3f} seconds")
+
     return wrapper
+
 
 @report_duration
 def downsample_mesh(input, output, target_ico, orig_ico):
-    print('Downsample ENTRY')
-   
-    template_path = '/home/sasha/code/mri_pet_surf/templates/sphericalunet'
+    print("Downsample ENTRY")
+
+    template_path = "/home/sasha/code/mri_pet_surf/templates/sphericalunet"
     input = str(input)
     if target_ico < orig_ico:
-        pools = [pool_layer(Get_neighs_order(rotated=0)[7 - i]) for i in reversed(range(target_ico, orig_ico))]
+        pools = [
+            pool_layer(Get_neighs_order(rotated=0)[7 - i])
+            for i in reversed(range(target_ico, orig_ico))
+        ]
     else:
-        print('Target ico should be smaller than original ico')
+        print("Target ico should be smaller than original ico")
         return
 
     log.info(f"Loading data from {input}...")
     datatype = None
     # Check if data is .ply
-    if input.endswith('.ply'):
+    if input.endswith(".ply"):
         verts = trimesh.load(input, process=False).vertices
-        datatype = 'ply'
-    elif input.endswith('.npy'):
+        datatype = "ply"
+    elif input.endswith(".npy"):
         verts = np.load(input)
         if verts.ndim == 1:
             verts = verts.reshape(-1, 1)
-        datatype = 'npy'
+        datatype = "npy"
     else:
         # Treating as FS data
         try:
             verts = fsio.read_geometry(input)[0].astype(np.float32)
-            datatype = 'fs-mesh'
+            datatype = "fs-mesh"
         except ValueError:
             verts = fsio.read_morph_data(input).reshape(-1, 1).astype(np.float32)
-            datatype = 'fs-morph'
-            
+            datatype = "fs-morph"
+
     log.info(f"Detected data type: {datatype}")
     log.info(f"Vertices loaded. Shape: {verts.shape}")
     # Downsample data
@@ -84,43 +92,51 @@ def downsample_mesh(input, output, target_ico, orig_ico):
     verts_new = verts_new.squeeze().numpy()
 
     faces_new = trimesh.load(
-        os.path.join(template_path, f'ico_{target_ico}.ply'), process=False).faces
-    
+        os.path.join(template_path, f"ico_{target_ico}.ply"), process=False
+    ).faces
+
     log.info(f"Vertices are downsampled. Shape: {verts_new.shape}")
 
-
-    if datatype == 'fs-morph':
+    if datatype == "fs-morph":
         fsio.write_morph_data(output, verts_new.squeeze())
-    elif datatype == 'fs-mesh':
+    elif datatype == "fs-mesh":
         fsio.write_geometry(output, verts_new, faces_new)
-    elif datatype == 'npy':
+    elif datatype == "npy":
         np.save(output.with_suffix(".npy"), verts_new.squeeze())
     else:
         new_mesh = trimesh.Trimesh(verts_new, faces_new)
         new_mesh.export(output.with_suffix(".ply"))
-    
+
     log.info(f"Mesh downsampled and saved to {output}")
 
 
 def register_segmentation(subject_dir, output_dir, template_path):
-
-    sample_output_dir = os.path.join(output_dir, 'reg_output')
+    sample_output_dir = os.path.join(output_dir, "reg_output")
     print(sample_output_dir)
-    aseg_nii_vol_path = os.path.join(output_dir, 'aseg.nii.gz')
-    out_affine_path = os.path.join(sample_output_dir,'affine_mri2mni.txt')
-    out_aseg_vol_path = os.path.join(output_dir, 'aseg.mni152.nii.gz')
+    aseg_nii_vol_path = os.path.join(output_dir, "aseg.nii.gz")
+    out_affine_path = os.path.join(sample_output_dir, "affine_mri2mni.txt")
+    out_aseg_vol_path = os.path.join(output_dir, "aseg.mni152.nii.gz")
     # FreeSurfer command
-    subprocess.call(['mri_convert', os.path.join(subject_dir, 'mri','aseg.mgz'), aseg_nii_vol_path])
+    subprocess.call(
+        ["mri_convert", os.path.join(subject_dir, "mri", "aseg.mgz"), aseg_nii_vol_path]
+    )
 
-    subprocess.call([
-        'reg_resample', 
-        '-ref', template_path, 
-        '-flo', aseg_nii_vol_path, 
-        '-trans', out_affine_path, 
-        '-res', out_aseg_vol_path, 
-        '-inter', '0', 
-        '-voff'
-        ])
+    subprocess.call(
+        [
+            "reg_resample",
+            "-ref",
+            template_path,
+            "-flo",
+            aseg_nii_vol_path,
+            "-trans",
+            out_affine_path,
+            "-res",
+            out_aseg_vol_path,
+            "-inter",
+            "0",
+            "-voff",
+        ]
+    )
 
     return out_aseg_vol_path
 
@@ -130,8 +146,8 @@ def extract_activations(
     aseg_mni152_path: str,
     *,
     erosion_iters: int = 3,
-    connectivity: int = 1,    
-    stat: str = "max",             # "mean" | "median" | "sum"
+    connectivity: int = 1,
+    stat: str = "max",  # "mean" | "median" | "sum"
     labels: Optional[Sequence[int]] = None,  # None -> all nonzero labels
     resample_pet_to_aseg: bool = True,
 ) -> pd.DataFrame:
@@ -152,16 +168,22 @@ def extract_activations(
 
     # Ensure PET is voxel-aligned with segmentation (same shape + affine)
     if resample_pet_to_aseg:
-        if pet_img.shape != seg_img.shape or not np.allclose(pet_img.affine, seg_img.affine, atol=1e-5):
-            log.info('PET is being resampled -> check registration.')
-            log.info(f'pet_img.shape {pet_img.shape}, seg_img.shape {seg_img.shape}')
-            log.info(f'pet_img.affine {pet_img.affine}, seg_img.affine {seg_img.affine}, difference {pet_img.affine - seg_img.affine}')
-            
-            pet_img = resample_from_to(pet_img, (seg_img.shape, seg_img.affine), order=1)  # linear for PET
+        if pet_img.shape != seg_img.shape or not np.allclose(
+            pet_img.affine, seg_img.affine, atol=1e-5
+        ):
+            log.info("PET is being resampled -> check registration.")
+            log.info(f"pet_img.shape {pet_img.shape}, seg_img.shape {seg_img.shape}")
+            log.info(
+                f"pet_img.affine {pet_img.affine}, seg_img.affine {seg_img.affine}, difference {pet_img.affine - seg_img.affine}"
+            )
+
+            pet_img = resample_from_to(
+                pet_img, (seg_img.shape, seg_img.affine), order=1
+            )  # linear for PET
 
     seg = np.asanyarray(seg_img.dataobj).astype(np.int32, copy=False)
     pet = np.asanyarray(pet_img.dataobj).astype(np.float32, copy=False)
-    
+
     bad = ~np.isfinite(pet)
     if bad.any():
         raise ValueError(
@@ -179,14 +201,12 @@ def extract_activations(
 
     labs.sort()
     if labs.size == 0:
-        raise ValueError(
-            f"No ROIs are provided for PET signal extraction"
-        )
+        raise ValueError("No ROIs are provided for PET signal extraction")
 
     # Relabel selected labels to 1..N so find_objects gives fast bboxes
-    max_lab = int(labs.max()) #255
-    lut = np.zeros(max_lab + 1, dtype=np.int32) #0...255
-    lut[labs] = np.arange(1, len(labs) + 1, dtype=np.int32) 
+    max_lab = int(labs.max())  # 255
+    lut = np.zeros(max_lab + 1, dtype=np.int32)  # 0...255
+    lut[labs] = np.arange(1, len(labs) + 1, dtype=np.int32)
     seg_rel = lut[seg]  # 0 stays 0; selected labels become 1..N
 
     obj_slices = ndimage.find_objects(seg_rel)  # length N
@@ -204,7 +224,7 @@ def extract_activations(
 
     rows: list[dict[str, int | float]] = []
 
-    for idx, lab in enumerate(labs, start=1): #1...255
+    for idx, lab in enumerate(labs, start=1):  # 1...255
         sl = obj_slices[idx - 1]
         if sl is None:
             rows.append({"label": int(lab), "n_vox": 0, stat: np.nan})
@@ -218,7 +238,7 @@ def extract_activations(
             exp_bbox_borders.append(slice(start, stop))
         exp_bbox_borders = tuple(exp_bbox_borders)
 
-        mask_np = (seg_rel[exp_bbox_borders] == idx)
+        mask_np = seg_rel[exp_bbox_borders] == idx
 
         # Equivalent to looping binary_erosion erosion_iters times
         if erosion_iters > 0:
@@ -233,7 +253,8 @@ def extract_activations(
             val = summarize(pet[exp_bbox_borders][mask_np])
         lut_aseg = pd.read_csv(Path(__file__).resolve().with_name("LUT_aseg.csv"))
         label_to_name: dict[int, str] = dict(zip(lut_aseg["label"], lut_aseg["name"]))
-        rows.append({"label": int(lab), "n_vox": nvox, stat: val, "roi_full_name": label_to_name[lab]})
+        rows.append(
+            {"label": int(lab), "n_vox": nvox, stat: val, "roi_full_name": label_to_name[lab]}
+        )
 
     return pd.DataFrame(rows).sort_values("label").reset_index(drop=True)
-

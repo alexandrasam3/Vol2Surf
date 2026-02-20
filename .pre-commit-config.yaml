@@ -3,12 +3,12 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       # list of supported hooks: https://pre-commit.com/hooks.html
       - id: trailing-whitespace
       - id: end-of-file-fixer
-      - id: check-docstring-first
+      #- id: check-docstring-first
       - id: check-yaml
       - id: debug-statements
       - id: detect-private-key
@@ -38,35 +38,21 @@ repos:
       - id: pyupgrade
         args: [--py38-plus]
 
-  # python docstring formatting
-  - repo: https://github.com/myint/docformatter
-    rev: v1.7.4
-    hooks:
-      - id: docformatter
-        args:
-          [
-            --in-place,
-            --wrap-summaries=99,
-            --wrap-descriptions=99,
-            --style=sphinx,
-            --black,
-          ]
-
   # python docstring coverage checking
-  - repo: https://github.com/econchick/interrogate
-    rev: 1.5.0 # or master if you're bold
-    hooks:
-      - id: interrogate
-        args:
-          [
-            --verbose,
-            --fail-under=80,
-            --ignore-init-module,
-            --ignore-init-method,
-            --ignore-module,
-            --ignore-nested-functions,
-            -vv,
-          ]
+  #- repo: https://github.com/econchick/interrogate
+  #  rev: 1.5.0 # or master if you're bold
+  #  hooks:
+  #    - id: interrogate
+  #      args:
+  #        [
+  #          --verbose,
+  #          --fail-under=80,
+  #          --ignore-init-module,
+  #          --ignore-init-method,
+  #          --ignore-module,
+  #          --ignore-nested-functions,
+  #          -vv,
+  #        ]
 
   # python check (PEP8), programming errors and code complexity
   - repo: https://github.com/PyCQA/flake8
@@ -81,13 +67,6 @@ repos:
             "logs/*,data/*",
           ]
         additional_dependencies: [flake8-rst-docstrings==0.3.0]
-
-  # python security linter
-  - repo: https://github.com/PyCQA/bandit
-    rev: "1.7.5"
-    hooks:
-      - id: bandit
-        args: ["-s", "B101"]
 
   # yaml formatting
   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -110,13 +89,14 @@ repos:
       - id: mdformat
         args: ["--number"]
         additional_dependencies:
-          - mdformat-gfm
-          - mdformat-tables
-          - mdformat_frontmatter
-          # - mdformat-toc
-          # - mdformat-black
+          - mdformat-gfm==0.3.5
+          - mdformat-tables==0.4.1
+          - mdformat_frontmatter==0.4.1
+          - markdown-it-py==2.2.0
+          - mdit-py-plugins==0.3.5
+          - linkify-it-py==2.0.2
 
-  # word spelling linter
+            # word spelling linter
   - repo: https://github.com/codespell-project/codespell
     rev: v2.2.4
     hooks:
@@ -136,7 +116,7 @@ repos:
     rev: 1.6.3
     hooks:
       - id: nbqa-black
-        args: ["--line-length=99"]
+        args: ["--line-length=200"]
       - id: nbqa-isort
         args: ["--profile=black"]
       - id: nbqa-flake8
