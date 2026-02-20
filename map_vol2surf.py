@@ -150,15 +150,12 @@ def register_all2mni(mri_id, sample_output_dir):
         subprocess.call(
             [
                 "reg_aladin",
-                "-ref",
-                MNI152_TEMPLATE_PATH,
-                "-flo",
-                interm_mri_vol_path,
-                "-aff",
-                out_affine_path,
+                "-ref", MNI152_TEMPLATE_PATH,
+                "-flo",interm_mri_vol_path,
+                "-aff",out_affine_path,
                 "-voff",
             ]
-        )
+        )  # fmt: skip
 
         if os.path.exists(os.path.join("outputResult.nii.gz")):
             os.remove(os.path.join("outputResult.nii.gz"))
@@ -166,19 +163,14 @@ def register_all2mni(mri_id, sample_output_dir):
         subprocess.call(
             [
                 "reg_resample",
-                "-ref",
-                MNI152_TEMPLATE_PATH,
-                "-flo",
-                interm_mri_vol_path,
-                "-trans",
-                out_affine_path,
-                "-res",
-                out_mri_vol_path,
-                "-inter",
-                "3",
+                "-ref", MNI152_TEMPLATE_PATH,
+                "-flo", interm_mri_vol_path,
+                "-trans", out_affine_path,
+                "-res", out_mri_vol_path,
+                "-inter", "3",
                 "-voff",
             ]
-        )
+        )  # fmt: skip
 
     log.debug(f"Registering surfaces of MRI {mri_id} to MNI152")
 
@@ -257,22 +249,20 @@ def register_pet2mri(mri_id, pet_id, mri_path, sample_output_dir, pet_filename=N
                 log.debug("Skull stripping mri")
                 skull_strip_mri_cmd = [
                     "mri_synthstrip",
-                    "-i",
-                    in_mri_vol_path,
-                    "-o",
-                    out_mri_brain_only,
-                ]
+                    "-i", in_mri_vol_path,
+                    "-o", out_mri_brain_only,
+                ]  # fmt: skip
+
                 subprocess.call(skull_strip_mri_cmd)
 
             if not os.path.isfile(out_pet_brain_only):
                 log.debug("Skull stripping pet")
                 skull_strip_pet_cmd = [
                     "mri_synthstrip",
-                    "-i",
-                    clean_pet_vol_path,
-                    "-o",
-                    out_pet_brain_only,
-                ]
+                    "-i", clean_pet_vol_path,
+                    "-o", out_pet_brain_only,
+                ] # fmt: skip
+
                 subprocess.call(skull_strip_pet_cmd)
                 # out_pet_brain_only = clean_pet_vol_path
 
@@ -287,15 +277,11 @@ def register_pet2mri(mri_id, pet_id, mri_path, sample_output_dir, pet_filename=N
         subprocess.call(
             [
                 "reg_aladin",
-                "-ref",
-                out_mri_brain_only,
-                "-flo",
-                out_pet_brain_only,
-                "-aff",
-                out_affine_path,
+                "-ref", out_mri_brain_only,
+                "-flo", out_pet_brain_only,
+                "-aff", out_affine_path,
                 "-voff",
-            ]
-        )
+            ])  # fmt: skip
 
         if os.path.exists(os.path.join("outputResult.nii.gz")):
             os.remove(os.path.join("outputResult.nii.gz"))
@@ -303,19 +289,14 @@ def register_pet2mri(mri_id, pet_id, mri_path, sample_output_dir, pet_filename=N
         subprocess.call(
             [
                 "reg_resample",
-                "-ref",
-                out_mri_brain_only,
-                "-flo",
-                clean_pet_vol_path,  # or out_pet_brain_only
-                "-trans",
-                out_affine_path,
-                "-res",
-                out_pet_vol_path,
-                "-inter",
-                "3",
+                "-ref", out_mri_brain_only,
+                "-flo", clean_pet_vol_path,  # or out_pet_brain_only
+                "-trans", out_affine_path,
+                "-res", out_pet_vol_path,
+                "-inter", "3",
                 "-voff",
             ]
-        )
+        )  # fmt: skip
 
         # Copy the PET volume to the output directory for convenience
         # shutil.copy(clean_pet_vol_path, os.path.join(sample_output_dir, os.path.basename(clean_pet_vol_path)))
@@ -412,19 +393,14 @@ def suvr_normalize(
         subprocess.call(
             [
                 "reg_resample",
-                "-ref",
-                MNI152_TEMPLATE_PATH,
-                "-flo",
-                pons_mask_filename,  # or out_pet_brain_only
-                "-trans",
-                fs2mni_affine,
-                "-res",
-                pons_mask_filename_mni152,
-                "-inter",
-                "0",
+                "-ref", MNI152_TEMPLATE_PATH,
+                "-flo", pons_mask_filename,  # or out_pet_brain_only
+                "-trans", fs2mni_affine,
+                "-res", pons_mask_filename_mni152,
+                "-inter", "0",
                 "-voff",
             ]
-        )
+        )  # fmt: skip
 
         os.remove(pons_mask_filename)
 
@@ -453,6 +429,12 @@ def suvr_normalize(
         suvr_pet_data = pet_vol_np / mean_pons_pet_activity
 
         mean_pons_pet_activity_unshifted = mean_pons_pet_activity - shift_value
+        if mean_pons_pet_activity_unshifted <= 0:
+            raise ValueError(
+                f"Unshifted pons mean is non-positive ({mean_pons_pet_activity_unshifted:.4f}) "
+                f"for mri_id={mri_id}, pet_id={pet_id}. "
+                f"Likely cause: registration failure or incorrect pons segmentation."
+            )
         suvr_pet_data_unshifted = (
             suvr_pet_data * (mean_pons_pet_activity / mean_pons_pet_activity_unshifted)
             - shift_value / mean_pons_pet_activity_unshifted
