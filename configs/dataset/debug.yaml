@@ -1,0 +1,4 @@
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-old/debug/mri
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-old/debug/pet
+output_dir: /mnt/nas/Data_Neuro/mri-pet-old/debug/pet
+id_file: /home/sasha/code/MetaData/tum-tables/rerun_subjects.csv

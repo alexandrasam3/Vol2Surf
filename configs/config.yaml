@@ -1,0 +1,24 @@
+defaults:
+  - dataset: debug
+  - _self_
+
+debug: true
+mm_under_white: 5
+ico_level: 7
+step_mm: 0.5
+extract_subcortical_activations: false
+
+subjects_dir: ${dataset.subjects_dir}
+pet_dir: ${dataset.pet_dir}
+output_dir: ${dataset.output_dir}
+id_file: ${dataset.id_file}
+
+hydra:
+  job:
+    chdir: false   # IMPORTANT: do NOT change cwd (avoids relative-path issues)
+  run:
+    dir: ./outputs_hydra/${now:%Y.%m.%d_%H:%M}  # where Hydra stores logs/config
+  job_logging:
+    formatters:
+      simple:
+        format: "%(levelname)s | %(processName)s | %(message)s"

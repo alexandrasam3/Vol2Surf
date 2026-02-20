@@ -1,0 +1,4 @@
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-old/synth/adni/mri
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-old/synth/adni/pet
+output_dir: /mnt/nas/Data_Neuro/mri-pet-old/synth/adni/pet
+id_file: /home/sasha/code/MetaData/adni-tables/idx_gen_data.csv
