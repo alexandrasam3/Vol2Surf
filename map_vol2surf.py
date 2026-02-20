@@ -32,7 +32,7 @@ MORPH_FILES = ['lh.thickness', 'lh.curv', 'lh.sulc', 'lh.area', 'rh.thickness', 
 # Number of parallel processes
 N_PROCESSES = os.cpu_count() or 1
 
-MNI152_TEMPLATE_PATH = '/mnt/nas/Data_Neuro/mni_templates/MNI152_T1_1mm.nii.gz'
+MNI152_TEMPLATE_PATH = './templates/mni_templates/MNI152_T1_1mm.nii.gz'
 
 
 os.environ["FREESURFER_HOME"] = "/mnt/nas/Software/Freesurfer74"
@@ -643,13 +643,13 @@ def main(cfg: DictConfig) -> None:
         iter = iter[:1]
         log.info(f"PROCESSING {len(iter)} SUBJECTS (DEBUG mode)")
        
-        with mp.Pool(2, initializer=init_worker, initargs=(rcfg, log_level)) as pool:
+        with mp.Pool(2, initializer=init_worker, initargs=(rcfg, logging.DEBUG)) as pool:
             pool.map(process_all, iter)
        
     else:
         log.info(f"PROCESSING {len(iter)} SUBJECTS with {N_PROCESSES} processes")
 
-        with mp.Pool(int(N_PROCESSES), initializer=init_worker, initargs=(rcfg, log_level)) as pool:
+        with mp.Pool(int(N_PROCESSES), initializer=init_worker, initargs=(rcfg, logging.INFO)) as pool:
             pool.map(process_all, iter)
 
         #pool = mp.Pool(N_PROCESSES)
