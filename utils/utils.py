@@ -6,7 +6,7 @@ from functools import (  # module for higher-order functions (functions that act
     wraps,
 )
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 import nibabel as nib
 import nibabel.freesurfer.io as fsio
@@ -47,6 +47,7 @@ def report_duration(func):
     return wrapper
 
 
+# outdated
 @report_duration
 def downsample_mesh(input, output, target_ico, orig_ico):
     print("Downsample ENTRY")
@@ -113,9 +114,9 @@ def downsample_mesh(input, output, target_ico, orig_ico):
 def register_segmentation(subject_dir, output_dir, template_path):
     sample_output_dir = os.path.join(output_dir, "reg_output")
     print(sample_output_dir)
-    aseg_nii_vol_path = os.path.join(output_dir, "aseg.nii.gz")
+    aseg_nii_vol_path = os.path.join(sample_output_dir, "aseg.nii.gz")
     out_affine_path = os.path.join(sample_output_dir, "affine_mri2mni.txt")
-    out_aseg_vol_path = os.path.join(output_dir, "aseg.mni152.nii.gz")
+    out_aseg_vol_path = os.path.join(sample_output_dir, "aseg.mni152.nii.gz")
     # FreeSurfer command
     subprocess.call(
         ["mri_convert", os.path.join(subject_dir, "mri", "aseg.mgz"), aseg_nii_vol_path]
@@ -137,7 +138,7 @@ def register_segmentation(subject_dir, output_dir, template_path):
             "-voff",
         ]
     )
-
+    os.remove(aseg_nii_vol_path)
     return out_aseg_vol_path
 
 
@@ -145,23 +146,22 @@ def extract_activations(
     pet_path: str,
     aseg_mni152_path: str,
     *,
-    erosion_iters: int = 3,
+    erosion_iters: int = 1,
     connectivity: int = 1,
-    stat: str = "max",  # "mean" | "median" | "sum"
-    labels: Optional[Sequence[int]] = None,  # None -> all nonzero labels
-    resample_pet_to_aseg: bool = True,
+    labels: Optional[
+        Sequence[Union[int, Sequence[int]]]
+    ] = None,  # None -> all nonzero labels; nested list -> merged ROI
+    resample_pet_to_aseg: bool = False,
+    save_mask_path: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Extract 1 PET summary value per aseg label (optionally after binary erosion).
-
-    Returns a DataFrame with columns: label, n_vox, <stat>
+    Extract mean, max, p95, and median PET values per aseg label or label group (optionally after binary erosion).
+    Returns a DataFrame with columns: label, n_vox, mean, max, p95, median, roi_full_name
     """
     if erosion_iters < 0:
         raise ValueError("erosion_iters must be >= 0")
     if connectivity not in (1, 2, 3):
         raise ValueError("connectivity must be one of {1,2,3}")
-    if stat not in ("mean", "median", "max"):
-        raise ValueError("stat must be one of {'mean','median','sum'}")
 
     seg_img = nib.load(str(aseg_mni152_path))
     pet_img = nib.load(str(pet_path))
@@ -190,44 +190,56 @@ def extract_activations(
             f"PET contains {int(bad.sum())} non-finite voxels (NaN/Inf) after loading/resampling."
         )
 
-    # Choose labels
-    if labels is None:
-        labs = np.unique(seg)
-        labs = labs[labs != 0]
-    else:
-        labs = np.asarray(labels, dtype=np.int32)
-        labs = labs[labs != 0]
-        labs = np.unique(labs)
-
-    labs.sort()
-    if labs.size == 0:
-        raise ValueError("No ROIs are provided for PET signal extraction")
-
-    # Relabel selected labels to 1..N so find_objects gives fast bboxes
-    max_lab = int(labs.max())  # 255
-    lut = np.zeros(max_lab + 1, dtype=np.int32)  # 0...255
-    lut[labs] = np.arange(1, len(labs) + 1, dtype=np.int32)
-    seg_rel = lut[seg]  # 0 stays 0; selected labels become 1..N
-
-    obj_slices = ndimage.find_objects(seg_rel)  # length N
-
-    structure = ndimage.generate_binary_structure(rank=3, connectivity=connectivity)
     vol_shape = seg.shape
 
-    def summarize(vals: np.ndarray) -> float:
-        if stat == "mean":
-            return float(np.nanmean(vals))
-        if stat == "median":
-            return float(np.nanmedian(vals))
-        # stat == "sum"
-        return float(np.nanmax(vals))
+    # Parse labels into groups: int -> single-label ROI, list-of-ints -> merged ROI
+    if labels is None:
+        raw = np.unique(seg)
+        raw = raw[raw != 0]
+        groups: list[list[int]] = [[int(label)] for label in raw]
+    else:
+        groups = []
+        for entry in labels:
+            if isinstance(entry, int):
+                groups.append([entry])
+            else:
+                groups.append([int(label) for label in entry])
 
-    rows: list[dict[str, int | float]] = []
+    if not groups:
+        raise ValueError("No ROIs are provided for PET signal extraction")
 
-    for idx, lab in enumerate(labs, start=1):  # 1...255
+    # Assign each group a 1-based index in a scratch volume for fast bbox lookup
+    seg_grouped = np.zeros(vol_shape, dtype=np.int32)
+    for idx, group in enumerate(groups, start=1):
+        for lab in group:
+            seg_grouped[seg == lab] = idx
+
+    obj_slices = ndimage.find_objects(seg_grouped)
+
+    structure = ndimage.generate_binary_structure(rank=3, connectivity=connectivity)
+
+    lut_aseg = pd.read_csv(Path(__file__).resolve().with_name("LUT_aseg.csv"))
+    label_to_name: dict[int, str] = dict(zip(lut_aseg["label"], lut_aseg["name"]))
+
+    rows: list[dict] = []
+    full_mask = np.zeros(vol_shape, dtype=np.uint8) if save_mask_path is not None else None
+
+    for idx, group in enumerate(groups, start=1):
         sl = obj_slices[idx - 1]
+        roi_name = "+".join(label_to_name.get(label, str(label)) for label in group)
+        lab_key = group[0] if len(group) == 1 else tuple(group)
+
         if sl is None:
-            rows.append({"label": int(lab), "n_vox": 0, stat: np.nan})
+            rows.append(
+                {
+                    "label": lab_key,
+                    "n_vox": 0,
+                    "mean": np.nan,
+                    "max": np.nan,
+                    "median": np.nan,
+                    "roi_full_name": roi_name,
+                }
+            )
             continue
 
         # Expand bbox by erosion radius so erosion near bbox edges is correct
@@ -238,9 +250,8 @@ def extract_activations(
             exp_bbox_borders.append(slice(start, stop))
         exp_bbox_borders = tuple(exp_bbox_borders)
 
-        mask_np = seg_rel[exp_bbox_borders] == idx
+        mask_np = seg_grouped[exp_bbox_borders] == idx
 
-        # Equivalent to looping binary_erosion erosion_iters times
         if erosion_iters > 0:
             mask_np = ndimage.binary_erosion(
                 mask_np, structure=structure, iterations=erosion_iters, border_value=0
@@ -248,13 +259,31 @@ def extract_activations(
 
         nvox = int(mask_np.sum())
         if nvox == 0:
-            val = np.nan
+            mean, mx, p95, median = np.nan, np.nan, np.nan, np.nan
         else:
-            val = summarize(pet[exp_bbox_borders][mask_np])
-        lut_aseg = pd.read_csv(Path(__file__).resolve().with_name("LUT_aseg.csv"))
-        label_to_name: dict[int, str] = dict(zip(lut_aseg["label"], lut_aseg["name"]))
+            vals = pet[exp_bbox_borders][mask_np]
+            mean = float(np.nanmean(vals))
+            mx = float(np.nanmax(vals))
+            p95 = float(np.nanpercentile(vals, 95))
+            median = float(np.nanmedian(vals))
+            if full_mask is not None:
+                full_mask_view = full_mask[exp_bbox_borders]
+                full_mask_view[mask_np] = 1
         rows.append(
-            {"label": int(lab), "n_vox": nvox, stat: val, "roi_full_name": label_to_name[lab]}
+            {
+                "label": lab_key,
+                "n_vox": nvox,
+                "mean": mean,
+                "max": mx,
+                "p95": p95,
+                "median": median,
+                "roi_full_name": roi_name,
+            }
         )
 
-    return pd.DataFrame(rows).sort_values("label").reset_index(drop=True)
+    if save_mask_path is not None:
+        mask_img = nib.Nifti1Image(full_mask, seg_img.affine, seg_img.header)
+        nib.save(mask_img, str(save_mask_path))
+        log.info(f"Eroded mask saved to {save_mask_path}")
+
+    return pd.DataFrame(rows).reset_index(drop=True)

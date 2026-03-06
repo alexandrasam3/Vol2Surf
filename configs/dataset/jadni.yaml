@@ -1,4 +1,4 @@
-subjects_dir: //mnt/cloud/Data_Neuro/mri-pet-all/jadni/mri/FS72_long_cross
-pet_dir: /mnt/cloud/Data_Neuro/mri-pet-all/jadni/pet
-output_dir: /mnt/cloud/Data_Neuro/mri-pet-all/jadni/pet
-id_file: /home/sasha/code/MetaData/jadni-tables/MRI2PET308.csv
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-all/jadni/mri/FS72_long_cross
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-all/jadni/pet
+output_dir: /mnt/nas/Data_Neuro/mri-pet-all/jadni/pet
+id_file: /home/sasha/code/_Projects/Vol2Surf/id_files/JADNI_MRI2PET308.csv

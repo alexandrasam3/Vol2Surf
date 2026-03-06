@@ -1,4 +1,4 @@
 subjects_dir: /mnt/nas/Data_Neuro/mri-pet-all/adni/mri
 pet_dir: /mnt/nas/Data_Neuro/mri-pet-all/adni/pet
 output_dir: /mnt/nas/Data_Neuro/mri-pet-all/adni/pet
-id_file: /home/sasha/code/MetaData/adni-tables/MRI2PET_DX_full.csv
+id_file: /home/sasha/code/_Projects/Vol2Surf/id_files/ADNI_MRI2PET_DX.csv

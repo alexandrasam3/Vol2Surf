@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 from utils.utils import extract_activations, register_segmentation
 
 WORKER_CFG = None
+BASE = Path(__file__).resolve().parents[0]
 
 ### Surfaces to process ###
 SURFACES = ["lh.white", "lh.pial", "rh.white", "rh.pial"]
@@ -39,7 +40,7 @@ MORPH_FILES = [
 # Number of parallel processes
 N_PROCESSES = os.cpu_count() or 1
 
-MNI152_TEMPLATE_PATH = "./templates/mni_templates/MNI152_T1_1mm.nii.gz"
+MNI152_TEMPLATE_PATH = to_absolute_path(BASE / "templates" / "MNI152_T1_1mm.nii.gz")
 
 
 os.environ["FREESURFER_HOME"] = "/mnt/nas/Software/Freesurfer74"
@@ -115,7 +116,8 @@ def resample_surf_barycentric(mri_id, sample_output_dir):
                     log.debug(f"Already resampled {outfile}")
 
             else:
-                outfile = os.path.join(sample_output_dir, surf)
+                file_name = surf + ".ico7"
+                outfile = os.path.join(sample_output_dir, file_name)
                 if not os.path.isfile(outfile):
                     source_file = os.path.join(WORKER_CFG["subjects_dir"], mri_id, "surf", surf)
                     data = surfa.load_overlay(source_file)
@@ -237,6 +239,7 @@ def register_pet2mri(mri_id, pet_id, mri_path, sample_output_dir, pet_filename=N
         # pet_vol_np[pet_vol_np < 0] = 0
 
         pet_vol_np = pet_vol_np + shift_value
+        print("PET VALUE CHECK ", pet_vol_np.min(), pet_vol_np.max(), pet_vol_np.mean())
 
         pet_vol_no_nan = nib.Nifti1Image(pet_vol_np, pet_vol.affine, header=pet_vol.header)
         nib.save(pet_vol_no_nan, clean_pet_vol_path)
@@ -261,7 +264,7 @@ def register_pet2mri(mri_id, pet_id, mri_path, sample_output_dir, pet_filename=N
                     "mri_synthstrip",
                     "-i", clean_pet_vol_path,
                     "-o", out_pet_brain_only,
-                ] # fmt: skip
+                ]  # fmt: skip
 
                 subprocess.call(skull_strip_pet_cmd)
                 # out_pet_brain_only = clean_pet_vol_path
@@ -341,7 +344,7 @@ def suvr_normalize(
     pet_id,
     fs2mni_affine,
     shift_value,
-    pet_filename=None,
+    # pet_filename=None,
 ):
     sample_output_dir = os.path.join(sample_output_dir, "reg_output")
 
@@ -349,13 +352,14 @@ def suvr_normalize(
         WORKER_CFG["subjects_dir"], mri_id, "mri", "brainstemSsLabels.v13.FSvoxelSpace.mgz"
     )
 
-    if pet_filename:
-        suvr_filename = "suvr_" + pet_filename[2:]
-        if pet_filename[-2:] != "gz":
-            suvr_filename += ".gz"
-    else:
-        suvr_filename = "suvr_" + f"{pet_id}_PET.nii.gz"
-
+    # if pet_filename:
+    #    suvr_filename = "suvr." + pet_filename[2:]
+    #    if pet_filename[-2:] != "gz":
+    #        suvr_filename += ".gz"
+    # else:
+    #    suvr_filename = "suvr_" + f"{pet_id}_PET.nii.gz"
+    suvr_filename = "suvr." + f"{pet_id}.mni152.nii.gz"
+    # suvr_filename =  'suvr.mni152.nii.gz'
     out_path = os.path.join(sample_output_dir, suvr_filename)
 
     if not os.path.isfile(bs_segm_path):
@@ -363,10 +367,8 @@ def suvr_normalize(
         run_segment_bs(subject_id=mri_id)
 
     if not os.path.isfile(out_path):
-        pons_mask_filename = os.path.join(sample_output_dir, "eroded_pons_mask.nii.gz")
-        pons_mask_filename_mni152 = os.path.join(
-            sample_output_dir, "eroded_pons_mask_mni152.nii.gz"
-        )
+        pons_mask_filename = os.path.join(sample_output_dir, "pons.eroded.nii.gz")
+        pons_mask_filename_mni152 = os.path.join(sample_output_dir, "pons.eroded.mni152.nii.gz")
 
         pet_vol = nib.load(pet_vol_path)
         pet_vol_np = pet_vol.get_fdata(dtype="float32")
@@ -448,7 +450,6 @@ def suvr_normalize(
         )
 
         suvr = nib.Nifti1Image(suvr_pet_data_unshifted, pet_vol.affine, header=pet_vol.header)
-
         nib.save(suvr, out_path)
 
     return out_path
@@ -668,19 +669,26 @@ def process_all(args):
         pet_id,
         fs2mni_affine,
         shift_value,
-        pet_filename=pet_filename,
+        # pet_filename=pet_filename,
     )
-    """
+
     if extract_subcortical_activations:
-        log.debug(f'Registering PET segmentation {pet_id} to MRI space')
+        log.debug(f"Registering PET segmentation {pet_id} to MRI space")
 
         aseg_mni152_path = register_segmentation(
-            subject_dir = os.path.join(WORKER_CFG['subjects_dir'], mri_id),
-            sample_output_dir = sample_output_dir,
-            template_path = MNI152_TEMPLATE_PATH)
+            subject_dir=os.path.join(WORKER_CFG["subjects_dir"], mri_id),
+            output_dir=sample_output_dir,
+            template_path=MNI152_TEMPLATE_PATH,
+        )
 
-        extract_activations(pet_path, aseg_mni152_path)
-    """
+        df = extract_activations(
+            pet_path,
+            aseg_mni152_path,
+            labels=[8, 10, [11, 12, 13, 26], 16, 17, 18, 47, 49, [50, 51, 52, 58], 53, 54],
+        )
+        out_csv = os.path.join(sample_output_dir, "reg_output", f"subcortical_suvr.{pet_id}.csv")
+        df.to_csv(out_csv, index=False)
+        log.debug(f"Subcortical activations saved to {out_csv}")
 
     find_maximum_along_a_line(
         sample_output_dir,
@@ -699,7 +707,7 @@ def main(cfg: DictConfig) -> None:
         SUBLIST = f.read().splitlines()
 
     exclude = ["fsaverage"]
-    SUBLIST = [s for s in SUBLIST if s not in exclude]
+    SUBLIST = [s for s in SUBLIST[1:] if s not in exclude]
 
     lh = f"surf/lh.pet.{cfg.mm_under_white}mm.ico7.npy"
     rh = f"surf/rh.pet.{cfg.mm_under_white}mm.ico7.npy"
@@ -745,9 +753,10 @@ def main(cfg: DictConfig) -> None:
         f"FINISHED! Output in {cfg.output_dir}",
     )
     _dt = time.perf_counter() - _t0
-    log.info(f"Script runtime:  {timedelta(seconds=_dt)}, {_dt:3f}s)", timedelta(seconds=_dt), _dt)
+    log.info(f"Script runtime: {timedelta(seconds=_dt)}, {_dt:.3f}s")
 
 
 if __name__ == "__main__":
+    # np.seterr(all="raise")
     np.seterr(all="warn")
     main()

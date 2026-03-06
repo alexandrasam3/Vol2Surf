@@ -3,10 +3,10 @@ defaults:
   - _self_
 
 debug: true
-mm_under_white: 5
+mm_under_white: 1
 ico_level: 7
 step_mm: 0.5
-extract_subcortical_activations: false
+extract_subcortical_activations: true
 
 subjects_dir: ${dataset.subjects_dir}
 pet_dir: ${dataset.pet_dir}

@@ -1,2 +1,5 @@
 outputs
 prepare_folders
+id_files
+outputs_hydra
+templates

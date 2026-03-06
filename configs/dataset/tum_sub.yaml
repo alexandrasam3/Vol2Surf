@@ -1,0 +1,6 @@
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-all/tum/mri
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-all/tum/pet
+output_dir: /home/sasha/code/_Projects/bcos-diag/data-prep/tabular/sub
+id_file: /home/sasha/code/_Projects/Vol2Surf/id_files/TUM_MRI2PET.csv
+erosion_iters: 0
+save_mask_and_indiv_df: false

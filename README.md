@@ -4,7 +4,7 @@ Scripts for mapping 3D medical data onto a surface.
 
 This scripts expects the following paths tobe provided in ./configs/dataset/*.yaml:
 
-1. A path to an ID_FILE with columns like mri_id,pet_id (or mri_id,pet_id,DX,pet_file_name), without column names.
+1. A path to an ID_FILE with columns like mri_id,pet_id (or mri_id,pet_id,DX,pet_file_name), with column names.
 
 2. A subjects_dir, with folders named like mri_id in ID_FILE. Each folder should correspond to freesurfer recon-all output folder, with mri_id/mri/orig.mgz and mri_id/surf/?h.pial, ?h.white surfaces, and optionally morphometry files. Transform files are required for brainstem segmentation. The best option is to use complete output folder of recon-all.
 
@@ -15,13 +15,13 @@ This scripts expects the following paths tobe provided in ./configs/dataset/*.ya
 5. The script can be executed with the following commands:
    python ./map_vol2surf.py dataset=jadni
 
-The file processes pairs of (MRI, PET) scans, producing per-vertex PET signal values on a standardized cortical surface mesh.                                                             
-                                                                                                                                                                                      
-Detailed pipeline Steps:
-                                                                                                                                                                                    
-1. Surface Resampling — resample_surf_barycentric                                                                                                                                   
+The file processes pairs of (MRI, PET) scans, producing per-vertex PET signal values on a standardized cortical surface mesh.
 
-- Takes the subject's FreeSurfer cortical surfaces (lh.white, lh.pial, rh.white, rh.pial) and morphometry files (thickness, curvature, etc.)                                        
+Detailed pipeline Steps:
+
+1. Surface Resampling — resample_surf_barycentric
+
+- Takes the subject's FreeSurfer cortical surfaces (lh.white, lh.pial, rh.white, rh.pial) and morphometry files (thickness, curvature, etc.)
 - Uses barycentric interpolation (via surfa) to warp them from the subject's native space to fsaverage7 (a standard 163,842-vertex template)
 - Converts surface coordinates from FreeSurfer's internal tkr space to scanner RAS world coordinates first
 

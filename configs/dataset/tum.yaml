@@ -1,4 +1,4 @@
-subjects_dir: /mnt/cloud/Data_Neuro/mri-pet-all/tum/mri
-pet_dir: /mnt/cloud/Data_Neuro/mri-pet-all/tum/pet
-output_dir: /mnt/cloud/Data_Neuro/mri-pet-all/tum/pet
-id_file: /home/sasha/code/MetaData/tum-tables/MRI2PET_DX.csv
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-all/tum/mri
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-all/tum/pet
+output_dir: /mnt/nas/Data_Neuro/mri-pet-all/tum/pet
+id_file: /home/sasha/code/_Projects/Vol2Surf/id_files/TUM_MRI2PET.csv

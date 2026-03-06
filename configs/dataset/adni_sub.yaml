@@ -1,0 +1,6 @@
+subjects_dir: /mnt/nas/Data_Neuro/mri-pet-all/adni/mri
+pet_dir: /mnt/nas/Data_Neuro/mri-pet-all/adni/pet
+output_dir: /home/sasha/code/_Projects/bcos-diag/data-prep/tabular/pet/adni
+id_file: /home/sasha/code/_Projects/Vol2Surf/id_files/ADNI_MRI2PET_DX.csv
+erosion_iters: 2
+save_mask_and_indiv_df: false
